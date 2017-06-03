@@ -7,10 +7,10 @@ from csv_handle import csv_readlist, csv_writelist
 
 
 
-def house_data():
+def house_data(area):
     house_list = []
-    for i in range(1,6):
-        url = 'http://zhongshan.jjshome.com/esf/a10/?n=%s&s=3' % (i)
+    for i in range(1,9):
+        url = 'http://zhongshan.jjshome.com/esf/%s/?n=%s&s=3' % (area, i)
         soup_data = soup_init(url)
         items_list_temp = web_data(soup_data)
         for items in items_list_temp:
@@ -18,6 +18,7 @@ def house_data():
     return house_list
     
 def sd_price_update(house_list):
+    # update subdistrict price and year
     sd_list = []
     for i in house_list:
         if i['sd_url'] not in sd_list:
@@ -33,6 +34,19 @@ def sd_price_update(house_list):
                 j['sd_price'] = sd_price
                 j['bias'] = float(sd_price) - float(j['price'])
                 j['sd_year'] = sd_year.encode('utf-8')
+    
+    for i in house_list:
+        if i['bias'] <= 0 and 'check' in i.keys():
+            i['check'] = i['check']+'/价格高'
+        elif i['bias'] <= 0:
+            i['check'] = '价格高'
+                
+    for i in house_list:
+        if i['sd_year'] != '暂无数据' and float(i['sd_year']) < 2005.0 and 'check' in i.keys():
+            i['check'] = i['check']+'/老小区'
+        elif i['sd_year'] != '暂无数据' and float(i['sd_year']) < 2005.0:
+            i['check'] = '老小区'
+            
     return house_list
                 
         
@@ -80,18 +94,36 @@ def web_data(soup):
         
         
         # find floor, size
-        attr11_temp = i.find_all('p', class_="attr")[0].find_all('span')[0].string.strip().encode('utf-8')
-        attr12_temp = i.find_all('p', class_="attr")[0].find_all('span')[1].string.encode('utf-8')
-        attr13_temp = i.find_all('p', class_="attr")[0].find_all('span')[2].string.encode('utf-8')
-        #attr1 = "%s-%s-%s" % (attr11_temp, attr12_temp, attr13_temp)
-        attr21_temp = i.find_all('p', class_="attr")[1].find_all('span')[0].string.strip().encode('utf-8')
-        attr22_temp = i.find_all('p', class_="attr")[1].find_all('span')[1].string.encode('utf-8')
-        #attr23_temp = i.find_all('p', class_="attr")[1].find_all('span')[2].string.encode('utf-8')
-        #attr2 = "%s-%s" % (attr21_temp, attr22_temp)
-        attr = "%s-%s-%s-%s-%s" % (attr11_temp, attr12_temp, attr13_temp, attr21_temp, attr22_temp)
-        #print attr
+        attr1_temp = i.find_all('p', class_="attr")[0].find_all('span')[0].string.strip().encode('utf-8')
+        attr2_temp = i.find_all('p', class_="attr")[0].find_all('span')[1].string.encode('utf-8')
+        attr3_temp = i.find_all('p', class_="attr")[0].find_all('span')[2].string.encode('utf-8')
+        
+        attr4_temp = i.find_all('p', class_="attr")[1].find_all('span')[0].string.strip().encode('utf-8')
+        attr5_temp = i.find_all('p', class_="attr")[1].find_all('span')[1].string.strip().encode('utf-8')
+        
+        attr_len = i.find_all('p', class_="attr")[1].find_all('span')
+        if len(attr_len) == 3:
+            attr6_temp = i.find_all('p', class_="attr")[1].find_all('span')[2].string.encode('utf-8')
+            
+            attr = "%s-%s-%s-%s-%s-%s" % (attr1_temp, attr2_temp, attr3_temp, attr4_temp, attr5_temp, attr6_temp)
+        else:
+            attr = "%s-%s-%s-%s-%s" % (attr1_temp, attr2_temp, attr3_temp, attr4_temp, attr5_temp)
+        if attr1_temp == '车位' and 'check' in item_dict.keys():
+            item_dict['check'] = item_dict['check']+'/车位'
+        elif attr1_temp == '车位':
+            item_dict['check'] = '车位'
+            
+        if (attr1_temp[0] == '0' or attr1_temp[0] == '1' or attr1_temp[0] == '2') and 'check' in item_dict.keys():
+            item_dict['check'] = item_dict['check']+'/小户'
+        elif attr1_temp[0] == '0' or attr1_temp[0] == '1' or attr1_temp[0] == '2':
+            item_dict['check'] = '小户'
+            
+        if attr5_temp.decode('utf-8')[0] == u'高' and 'check' in item_dict.keys():
+            item_dict['check'] = item_dict['check']+'/高楼层'
+        elif attr5_temp.decode('utf-8')[0] == u'高':
+            item_dict['check'] = '高楼层'
+            
         item_dict['attr'] = attr
-        #item_dict['attr2'] = attr2
         
         #finally append to list
         items_list_temp.append(item_dict)
@@ -100,9 +132,10 @@ def web_data(soup):
     
 if __name__ == "__main__":
     file_path = '/srv/www/idehe.com/house/'
-    file = 'house_data.csv'
+    area = "a5"
+    file = 'house_data_%s.csv' % (area)
     
-    h_data = house_data()
+    h_data = house_data(area)
     
     h_data_add_sd_price = sd_price_update(h_data)
     
